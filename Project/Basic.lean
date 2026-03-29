@@ -1,4 +1,5 @@
-
+-- Authored by: YANG Ruijia, LIU Rongqin
+-- 2026 3/30 01:18
 
 import Mathlib.Tactic
 import Mathlib.Data.Nat.Prime.Basic
@@ -55,6 +56,7 @@ lemma n_aMODm_implies_n_121MOD241 (h : n ≡ a [MOD m]) :
   have hm : 241 ∣ m := by decide
   have : n ≡ a [MOD 241] := by exact Nat.ModEq.of_dvd hm h
   exact ModEq.trans this a_121mod241
+
 
 
 lemma cover (k : ℕ) :
@@ -310,10 +312,154 @@ lemma branch_k_23mod24_forces_241mid_p (k : ℕ) (p : ℕ) (hn : n ≡ a [MOD m]
 
 
 
+lemma p_eq_q {p q : ℕ} (hp : p.Prime) (hq : q.Prime) (hdvd : q ∣ p) : p = q := by
+  have q_ne_1 : q ≠ 1 := hq.ne_one
+  exact (Nat.Prime.dvd_iff_eq hp q_ne_1).mp hdvd
 
+lemma p_values {p : ℕ} (hp : p.Prime) (hdvd : 3 ∣ p ∨ 5 ∣ p ∨ 7 ∣ p ∨ 13 ∣ p ∨ 17 ∣ p ∨ 241 ∣ p) :
+    p = 3 ∨ p = 5 ∨ p = 7 ∨ p = 13 ∨ p = 17 ∨ p = 241 := by
+    rcases hdvd with h3|h5|h7|h13|h17|h241
+    · left; exact p_eq_q hp (by exact prime_three) h3
+    · right; left; exact p_eq_q hp (by exact prime_five) h5
+    · right; right; left; exact p_eq_q hp (by exact prime_seven) h7
+    · right; right; right; left; exact p_eq_q hp (by norm_num) h13
+    · right; right; right; right; left; exact p_eq_q hp (by norm_num) h17
+    · right; right; right; right; right; exact p_eq_q hp (by norm_num) h241
+
+
+
+lemma pow2_mod_periodic (k p d : ℕ) (h : 2 ^ d ≡ 1 [MOD p]) (hd : 0 < d) :
+  2^k ≡ 2^(k % d) [MOD p] := by
+  let r := k % d; let q := k / d
+  have hr : r < d := Nat.mod_lt k hd
+  have hk : k = d * q + r := (Nat.div_add_mod k d).symm
+  rw [hk, pow_add, pow_mul]
+  --(2 ^ d) ^ q * 2 ^ r ≡ 2 ^ ((d * q + r) % d) [MOD p]
+  have hq : (2^d)^q ≡ 1^q [MOD p]:= Nat.ModEq.pow q h
+  rw [one_pow] at hq
+  have h_final := Nat.ModEq.mul hq (Nat.ModEq.refl (2^r))
+  rw [one_mul] at h_final
+  have : (d * q + r) % d = r := by
+    rw [Nat.add_comm]
+    rw [Nat.add_mul_mod_self_left]
+    exact Nat.mod_eq_of_lt hr
+  rw [this]
+  exact h_final
+
+lemma pow2_mod7_cases (k : ℕ) :
+      2^k ≡ 1 [MOD 7] ∨ 2^k ≡ 2 [MOD 7] ∨ 2^k ≡ 4 [MOD 7] := by
+    have h_periodic := pow2_mod_periodic k 7 3 (by rfl) (by norm_num)
+    let r := k % 3
+    have hrep : r = k % 3 := by exact?
+    have hr : r < 3 := Nat.mod_lt k (by norm_num)
+    interval_cases r
+    · left
+      have : 2 ^ k ≡ 2 ^ 0 [MOD 7] := by rw [← hrep] at h_periodic; assumption
+      exact?
+    · right; left
+      have : 2 ^ k ≡ 2 ^ 1 [MOD 7] := by rw [← hrep] at h_periodic; assumption
+      exact?
+    · right; right
+      have : 2 ^ k ≡ 2 ^ 2 [MOD 7] := by rw [← hrep] at h_periodic; assumption
+      exact?
+
+
+
+lemma pow2_mod3_cases (k : ℕ) :
+      2^k ≡ 1 [MOD 3] ∨ 2^k ≡ 2 [MOD 3] := by
+  have h_periodic := pow2_mod_periodic k 3 2 (by norm_num) (by norm_num [Nat.ModEq])
+  let r := k % 2
+  have hrep : r = k % 2 := by exact?
+  have hr : r < 2 := Nat.mod_lt k (by norm_num)
+  interval_cases r
+  · left
+    have : 2 ^ k ≡ 2 ^ 0 [MOD 3] := by rw [← hrep] at h_periodic; assumption
+    exact?
+  · right
+    have : 2 ^ k ≡ 2 ^ 1 [MOD 3] := by rw [← hrep] at h_periodic; assumption
+    exact?
+
+lemma values_exclusion (n k p : ℕ)
+    (h_rep : n = p + 2 ^ k)
+    (hn7 : n ≡ 1 [MOD 7])
+    (hn3 : n ≡ 1 [MOD 3])
+    (hp : p.Prime)
+    (hdvd : 3 ∣ p ∨ 5 ∣ p ∨ 7 ∣ p ∨ 13 ∣ p ∨ 17 ∣ p ∨ 241 ∣ p) :
+    False := by
+  have hp_cases := p_values hp hdvd
+  rcases hp_cases with rfl | rfl | rfl | rfl | rfl | rfl
+  · -- p = 3
+    have h : 1 ≡ 3 + 2^k [MOD 7] := by
+      have h_symm := hn7.symm
+      rw [h_rep] at h_symm
+      exact h_symm
+    rcases pow2_mod7_cases k with hk|hk|hk <;>
+    (have h_c := h.trans (Nat.ModEq.add (ModEq.refl 3) hk)
+     unfold Nat.ModEq at h_c; norm_num at h_c)
+  · -- p = 5
+    have h : 1 ≡ 5 + 2^k [MOD 7] := by
+      have h_symm := hn7.symm
+      rw [h_rep] at h_symm
+      exact h_symm
+    rcases pow2_mod7_cases k with hk|hk|hk <;>
+    (have h_c := h.trans (Nat.ModEq.add (Nat.ModEq.refl 5) hk)
+     unfold Nat.ModEq at h_c; norm_num at h_c)
+  · -- p = 7
+    have h : 1 ≡ 7 + 2^k [MOD 3] := by
+      have h_symm := hn3.symm
+      rw [h_rep] at h_symm
+      exact h_symm
+    rcases pow2_mod3_cases k with hk|hk <;>
+    (have h_c := h.trans (Nat.ModEq.add (Nat.ModEq.refl 7) hk)
+     unfold Nat.ModEq at h_c; norm_num at h_c)
+  · -- p = 13
+    have h : 1 ≡ 13 + 2^k [MOD 3] := by
+      have h_symm := hn3.symm
+      rw [h_rep] at h_symm
+      exact h_symm
+    rcases pow2_mod3_cases k with hk|hk <;>
+    (have h_c := h.trans (Nat.ModEq.add (Nat.ModEq.refl 13) hk)
+     unfold Nat.ModEq at h_c; norm_num at h_c)
+  · -- p = 17
+    have h : 1 ≡ 17 + 2^k [MOD 7] := by
+      have h_symm := hn7.symm
+      rw [h_rep] at h_symm
+      exact h_symm
+    rcases pow2_mod7_cases k with hk|hk|hk <;>
+    (have h_c := h.trans (Nat.ModEq.add (Nat.ModEq.refl 17) hk)
+     unfold Nat.ModEq at h_c; norm_num at h_c)
+  · -- p = 241
+    have h : 1 ≡ 241 + 2^k [MOD 7] := by
+      have h_symm := hn7.symm
+      rw [h_rep] at h_symm
+      exact h_symm
+    rcases pow2_mod7_cases k with hk|hk|hk <;>
+    (have h_c := h.trans (Nat.ModEq.add (Nat.ModEq.refl 241) hk)
+     unfold Nat.ModEq at h_c; norm_num at h_c)
 
 
 
 theorem exists_progression_no_prime_add_pow_two (hn : n ≡ a [MOD m]) :
-    n ≡ a [MOD m] → ¬ ∃ (p k : ℕ), p.Prime ∧ n = p + 2^k := by
-  sorry
+    ∀ (p k : ℕ), p.Prime → n ≠ p + 2^k := by
+  intro p k hp h_rep
+  have hn7 : n ≡ 1 [MOD 7] := by exact n_aMODm_implies_n_1MOD7 hn
+  have hn3 : n ≡ 1 [MOD 3] := by exact n_aMODm_implies_n_1MOD3 hn
+  rcases cover k with hk2 | hk3 | hk4 | hk8 | hk12 | hk24
+  · -- k ≡ 0 mod 2
+    have h_3mid_p : 3 ∣ p := by exact branch_k_0mod2_forces_3mid_p k p hn hk2 h_rep
+    exact values_exclusion n k p h_rep hn7 hn3 hp (by tauto)
+  · -- k ≡ 0 mod 3
+    have h_7mid_p : 7 ∣ p := by exact branch_k_0mod3_forces_7mid_p k p hn hk3 h_rep
+    exact values_exclusion n k p h_rep hn7 hn3 hp (by tauto)
+  · -- k ≡ 1 mod 4
+    have h_5mid_p : 5 ∣ p := by exact branch_k_1mod4_forces_5mid_p k p hn hk4 h_rep
+    exact values_exclusion n k p h_rep hn7 hn3 hp (by tauto)
+  · -- k ≡ 3 mod 8
+    have h_17mid_p : 17 ∣ p := by exact branch_k_3mod8_forces_17mid_p k p hn hk8 h_rep
+    exact values_exclusion n k p h_rep hn7 hn3 hp (by tauto)
+  · -- k ≡ 7 mod 12
+    have h_13mid_p : 13 ∣ p := by exact branch_k_7mod12_forces_13mid_p k p hn hk12 h_rep
+    exact values_exclusion n k p h_rep hn7 hn3 hp (by tauto)
+  · -- k ≡ 23 mod 24
+    have h_241mid_p : 241 ∣ p := by exact branch_k_23mod24_forces_241mid_p k p hn hk24 h_rep
+    exact values_exclusion n k p h_rep hn7 hn3 hp (by tauto)
