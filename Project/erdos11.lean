@@ -14,6 +14,7 @@ open BigOperators
 
 
 -- `p` refers an odd prime
+section NeedHp
 variable {p : ℕ} (hp : p.Prime ∧ p > 2)
 include hp
 -- `p` is a Wieferich prime if `p` is a prime and `p² ∣ 2^{p-1} - 1`
@@ -112,6 +113,7 @@ lemma ord2_p2_branch : (ord2 (p^2) = ord2 p) ∨ (ord2 (p^2) = p * ord2 p) := by
   · right; rw [hk, mul_comm]
 
 
+
 lemma nonW_primes_ord2_relation (hp_nonW : p ∉ W) : ord2 (p^2) = p * ord2 (p) := by
   have h_branch : (ord2 (p^2) = ord2 p) ∨ (ord2 (p^2) = p * ord2 p) := ord2_p2_branch hp
   have h_div_p_1 : ord2 p ∣ p - 1 := ord2_p_div_p_minus_1 hp
@@ -141,15 +143,62 @@ lemma W_primes_ord2_relation (hp_W : p ∈ W) : ord2 (p^2) = ord2 (p) := by
     have h_sub_pos : 0 < p - 1 := Nat.sub_pos_of_lt h_p_gt_1
     have h_le : p ≤ p - 1 := Nat.le_of_dvd h_sub_pos h_p_dvd
     omega
+end NeedHp
 
 
 def P (r : ℕ) : Set ℕ :=
   {p | (p ∉ W) ∧ (ord2 p = r)}
 
+
 /- We first show that such set is finite so that we may
-  write it as a ascending list p₁ < ⋯ < pₘ. -/
+  write it as a ascending list p₁ < ⋯ < pₘ.
+  that is pr is finite set
+-/
+
+/-
+  (2 Zmod p) ^ r = 1     2 ^ r mod p = 1     2^r ≥ 1     2^r - 1 mod p = 0
+  finally p ∣ 2 ^r -1
+-/
+
+lemma dvd_of_ord2_eq (p r : ℕ) (h : ord2 p = r) : p ∣ 2^r - 1 := by
+  have h1 : (2 : ZMod p) ^ r = 1 := by
+    have h2 : orderOf (2 : ZMod p) = r := h
+    rw [← h2]
+    exact pow_orderOf_eq_one (2 : ZMod p)
+  have h3 : ((2^r : ℕ) : ZMod p ) = 1 := by
+    simpa
+  have h4 : (2^r : ℕ) ≥ 1 := by
+    apply Nat.one_le_pow
+    exact Nat.zero_lt_two
+  have h5 : ((2^r - 1 : ℕ) : ZMod p) = 0 := by
+    rw [Nat.cast_sub h4]
+    rw [h3]
+    simp
+  have h6 : p ∣ (2^r - 1 :ℕ) := by
+    rw[← ZMod.natCast_eq_zero_iff]
+    exact h5
+  exact h6
+
+lemma P_subset (r : ℕ) : P r ⊆ {p : ℕ | p ∣ 2^r - 1} := by
+  intro p hp
+  have h7 : ord2 p = r := hp.2
+  exact dvd_of_ord2_eq p r  h7
+
 lemma P_r_is_finite (r : ℕ) (hr : r ≥ 1) : (P r).Finite := by
-  sorry
+  have h1 : P r ⊆ {p : ℕ | p ∣ 2^r - 1} := by apply P_subset r
+  have h2 : (2^r - 1 : ℕ) > 0 := by
+    have h3 : 2^r ≥ 2 := by
+      have h4 : 2^r ≥ 2^1 := by exact Nat.le_pow hr
+      omega
+    omega
+  have h3 : {p : ℕ | p ∣ 2^r - 1} = (Nat.divisors (2^r - 1) : Set ℕ) := by
+    ext p  -- A = B ↔ ∀ p, p∈A ↔ p∈B
+    simp
+    omega
+  rw [h3] at h1
+  apply Set.Finite.subset -- two conditions :    finite and subset
+  · exact Finset.finite_toSet (Nat.divisors (2^r - 1))
+  · exact h1
 
 noncomputable def P_list (r : ℕ) (h_Pfin : (P r).Finite) : List ℕ :=
   h_Pfin.toFinset.sort (· ≤ ·)
@@ -181,9 +230,92 @@ lemma upperBound_of_prod_in_P_r (r : ℕ) (hr : r ≥ 1) (h_Pfin : (P r).Finite)
   Taking logrithm, we have `m < {r · log 2}/{log r}` for `r > 1`.
   And for `r = 1`, the set `P r` is empty hence `m = 0`.
 -/
+
+
 lemma upperBound_of_m_by_r (r : ℕ) (hr : r > 1) (h_Pfin : (P r).Finite) :
     (P_list r h_Pfin).length < (r * Real.log 2) / (Real.log r) := by
-  sorry
+  -- 1 define m and L more easy to write
+  let m := (P_list r h_Pfin).length
+  let L := P_list r h_Pfin
+  -- we need a map to use list product and something else
+  let K : List ℕ := (List.range m).map (fun j ↦ (j+1)*r)
+  have h_len_val : K.length = m := by
+    simp [K, m]
+-- 1 L.length = K.length = m
+  have h_len : L.length = K.length := by
+    simp [K, m]
+    rfl
+-- 2. ∀ j < m, L[j] ≥ K[j]
+  have h_ge_one : r ≥ 1 := by linarith
+  have h_elem : ∀ j (hj : j < m),
+      L.get ⟨j, by simpa [m] using hj⟩ ≥ K.get ⟨j, by (rw [h_len_val] ; exact hj)⟩ := by
+    intro j hj
+    -- K.get to (j+1)*r
+    have h_K_get : K.get ⟨j, by (rw [h_len_val] ; exact hj)⟩ = (j + 1) * r := by
+      simp [K, List.getElem_map, List.getElem_range, ]
+    have h_p_lower : L.get ⟨j, by simpa [m] using hj⟩ ≥ (j + 1) * r + 1 :=
+      lowerBound_of_p_in_P_r r h_ge_one h_Pfin j hj
+    linarith
+  -- 3. L.prod ≥ K.prod
+  have h_forall : List.Forall₂ (fun (x1 x2 : ℕ) => x1 ≤ x2) K L := by
+    exact List.forall₂_of_length_eq_of_get h_len_val fun i h₁ ↦ h_elem i
+  have h_prod1 : K.prod ≤ L.prod := by
+    exact List.Forall₂.prod_le_prod' h_forall
+  have h_prod1' : L.prod ≥ K.prod := h_prod1
+  -- 4. K.prod = m.factorial * r ^ m
+  have h_prod2 : K.prod = m.factorial * r ^ m := by
+    -- List.prod 转 Finset.prod
+    have h1 : K.prod = ∏ j ∈ Finset.range m, ((j + 1) * r) := by
+      exact
+        Eq.symm
+          (Nat.add_zero
+            (List.foldr (fun x1 x2 ↦ x1 * x2) 1 (List.map (fun j ↦ (j + 1) * r) (List.range m))))
+    rw [h1]
+    -- ∏ (j+1)*r = (∏ j+1) * (∏ r)
+    have h2 : ∏ j ∈ Finset.range m, ((j + 1) * r) =
+    (∏ j ∈ Finset.range m, (j + 1)) * (∏ j ∈ Finset.range m, r) := by
+      rw [Finset.prod_mul_distrib]
+    rw [h2]
+    -- ∏ j ∈ range m, (j+1) = m.factorial
+    have h3 : (∏ j ∈ Finset.range m, (j + 1)) = m.factorial := by
+      induction m with
+      | zero => exact Finset.prod_range_add_one_eq_factorial 0
+      | succ m ih =>
+        exact Finset.prod_range_add_one_eq_factorial (m + 1)
+    rw [h3]
+    -- ∏ j ∈ range m, r = r ^ m
+    have h4 : (∏ j ∈ Finset.range m, r) = r ^ m := by
+      simp [Finset.prod_const]
+    rw [h4]
+  -- 5. L.prod ≥ m.factorial * r ^ m
+  have h_prod_lower : L.prod ≥ m.factorial * r ^ m := by
+    rw [h_prod2] at h_prod1
+    exact h_prod1
+  -- 6. m! * r^m < 2^r
+  have h_ge_one : r ≥ 1 := by linarith
+  have h_mixed : m.factorial * r ^ m < 2 ^ r := by
+    have h_upper := upperBound_of_prod_in_P_r r h_ge_one h_Pfin
+    exact Nat.lt_of_le_of_lt h_prod_lower h_upper
+  -- 7. to real number
+  have h_real : (↑(m.factorial) * ↑r ^ m : ℝ) < (↑2 ^ r : ℝ) := by
+    exact_mod_cast h_mixed
+  -- 8. log
+  have h_pos1 : (0 : ℝ) < (↑(m.factorial) * (↑r : ℝ) ^ m) := by positivity
+  have h_pos2 : (0 : ℝ) < (↑2 : ℝ) ^ r := by positivity
+  -- use Real.log_lt_log
+  have h_log : Real.log ((↑(m.factorial) * (↑r : ℝ) ^ m)) < Real.log ((↑2 : ℝ) ^ r) := by
+    apply Real.log_lt_log h_pos1
+    exact h_real
+  rw [Real.log_mul (by positivity) (by positivity), Real.log_pow, Real.log_pow] at h_log
+  -- 9. log(m!) ≥ 0
+  have h_log_fact : 0 ≤ Real.log (↑m.factorial : ℝ) := by
+    exact Real.log_natCast_nonneg m.factorial
+  have h_core : (↑m : ℝ) * Real.log (↑r : ℝ) < (↑r : ℝ) * Real.log 2 := by
+    linarith
+  -- 11. divide log r
+  have h_log_r : 0 < Real.log (↑r : ℝ) := Real.log_pos (by exact_mod_cast hr)
+  -- lt_div_iff₀
+  exact (lt_div_iff₀ h_log_r).mpr h_core
 
 /-
   The contribution to the series can be divided into each `P r`, that is
