@@ -148,8 +148,6 @@ end NeedHp
 
 def P (r : ℕ) : Set ℕ :=
   {p | (p ∉ W) ∧ (ord2 p = r)}
-
-
 /- We first show that such set is finite so that we may
   write it as a ascending list p₁ < ⋯ < pₘ.
   that is pr is finite set
@@ -252,7 +250,7 @@ lemma upperBound_of_m_by_r (r : ℕ) (hr : r > 1) (h_Pfin : (P r).Finite) :
     intro j hj
     -- K.get to (j+1)*r
     have h_K_get : K.get ⟨j, by (rw [h_len_val] ; exact hj)⟩ = (j + 1) * r := by
-      simp [K, List.getElem_map, List.getElem_range, ]
+      simp [K, List.getElem_map, List.getElem_range]
     have h_p_lower : L.get ⟨j, by simpa [m] using hj⟩ ≥ (j + 1) * r + 1 :=
       lowerBound_of_p_in_P_r r h_ge_one h_Pfin j hj
     linarith
@@ -264,7 +262,7 @@ lemma upperBound_of_m_by_r (r : ℕ) (hr : r > 1) (h_Pfin : (P r).Finite) :
   have h_prod1' : L.prod ≥ K.prod := h_prod1
   -- 4. K.prod = m.factorial * r ^ m
   have h_prod2 : K.prod = m.factorial * r ^ m := by
-    -- List.prod 转 Finset.prod
+    -- List.prod to Finset.prod
     have h1 : K.prod = ∏ j ∈ Finset.range m, ((j + 1) * r) := by
       exact
         Eq.symm
@@ -304,8 +302,9 @@ lemma upperBound_of_m_by_r (r : ℕ) (hr : r > 1) (h_Pfin : (P r).Finite) :
   have h_pos2 : (0 : ℝ) < (↑2 : ℝ) ^ r := by positivity
   -- use Real.log_lt_log
   have h_log : Real.log ((↑(m.factorial) * (↑r : ℝ) ^ m)) < Real.log ((↑2 : ℝ) ^ r) := by
-    apply Real.log_lt_log h_pos1
-    exact h_real
+    apply Real.log_lt_log
+    · exact h_pos1
+    · exact h_real
   rw [Real.log_mul (by positivity) (by positivity), Real.log_pow, Real.log_pow] at h_log
   -- 9. log(m!) ≥ 0
   have h_log_fact : 0 ≤ Real.log (↑m.factorial : ℝ) := by
@@ -321,11 +320,30 @@ lemma upperBound_of_m_by_r (r : ℕ) (hr : r > 1) (h_Pfin : (P r).Finite) :
   The contribution to the series can be divided into each `P r`, that is
     `∑_{p ∉ W} {1 / ord2 (p^2)} = ∑_{r ≥ 2} { ∑_{p ∈ P r} {1 / ord2 (p^2)} }`.
 -/
+
 lemma divideContribution_into_r :
     ∑' (p : {p // p.Prime ∧ p > 2 ∧ p ∉ W}), (1 : ℝ) / (ord2 (p ^ 2)) =
     ∑' (r : ℕ), ∑' (p : {p // p ∈ P r}), (1 : ℝ) / (ord2 (p ^ 2))
     := by
-  sorry
+  -- 1. left set == right set
+  have h1 : {p : ℕ | p.Prime ∧ p > 2 ∧ p ∉ W} = ⋃ (r : ℕ), P r := by
+    ext p
+    simp  -- p ∧ p > 2 ∧ p ∉ W  iff  ∃ i, p ∈ P i
+    constructor
+    · intro h
+      have h_p_notin_W : p ∉ W := h.right.right
+      let r : ℕ := ord2 p
+      have h_p_in_P_r : p ∈ P r := by simpa[P, r]
+      exact exists_eq_right'.mpr h_p_notin_W
+    · intro h
+      cases h with
+      | intro r hr
+      have h_p_notin_W : p ∉ W := hr.left
+      have h_p_prime : p.Prime := by exact?
+      have h_p_gt_2 : p > 2 := by apply?
+      have h_main : p.Prime ∧ p > 2 ∧ p ∉ W := ⟨h_p_prime, h_p_gt_2, h_p_notin_W⟩
+      exact h_main
+
 
 
 -- The n-th harmonic number
