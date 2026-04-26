@@ -147,7 +147,7 @@ end NeedHp
 
 
 def P (r : ℕ) : Set ℕ :=
-  {p | (p ∉ W) ∧ (ord2 p = r)}
+  {p | (p ∉ W) ∧ (ord2 p = r) ∧ p.Prime ∧ p > 2}
 /- We first show that such set is finite so that we may
   write it as a ascending list p₁ < ⋯ < pₘ.
   that is pr is finite set
@@ -179,7 +179,7 @@ lemma dvd_of_ord2_eq (p r : ℕ) (h : ord2 p = r) : p ∣ 2^r - 1 := by
 
 lemma P_subset (r : ℕ) : P r ⊆ {p : ℕ | p ∣ 2^r - 1} := by
   intro p hp
-  have h7 : ord2 p = r := hp.2
+  have h7 : ord2 p = r := hp.2.1
   exact dvd_of_ord2_eq p r  h7
 
 lemma P_r_is_finite (r : ℕ) (hr : r ≥ 1) : (P r).Finite := by
@@ -325,24 +325,91 @@ lemma divideContribution_into_r :
     ∑' (p : {p // p.Prime ∧ p > 2 ∧ p ∉ W}), (1 : ℝ) / (ord2 (p ^ 2)) =
     ∑' (r : ℕ), ∑' (p : {p // p ∈ P r}), (1 : ℝ) / (ord2 (p ^ 2))
     := by
-  -- 1. left set == right set
+  let f p := (1 : ℝ) / ord2 (p^2) -- for convinient
+  -- left set == right set
   have h1 : {p : ℕ | p.Prime ∧ p > 2 ∧ p ∉ W} = ⋃ (r : ℕ), P r := by
     ext p
-    simp  -- p ∧ p > 2 ∧ p ∉ W  iff  ∃ i, p ∈ P i
+    simp only [gt_iff_lt, Set.mem_setOf_eq, Set.mem_iUnion]  -- p ∧ p > 2 ∧ p ∉ W  iff  ∃ r, p ∈ P r
     constructor
     · intro h
       have h_p_notin_W : p ∉ W := h.right.right
+      have h_p_prime : p.Prime := h.1
+      have h_p_gt_2 : p > 2 := h.2.1
       let r : ℕ := ord2 p
-      have h_p_in_P_r : p ∈ P r := by simpa[P, r]
-      exact exists_eq_right'.mpr h_p_notin_W
+      have h_ord_eq : ord2 p = r := by rfl
+      have h_P_iff : ∀ (q : ℕ), q ∈ P r ↔ (q ∉ W) ∧ (ord2 q = r) ∧ q.Prime ∧ q > 2 := by
+        intro q
+        simp [P]
+      have h : p ∈ P r ↔ (p ∉ W) ∧ (ord2 p = r) ∧ p.Prime ∧ p > 2 := h_P_iff p
+      have h_in_Pr : p ∈ P r := ⟨h_p_notin_W, h_ord_eq, h_p_prime, h_p_gt_2⟩
+      have h_main : ∃ (r : ℕ), p ∈ P r := by exact Exists.intro r h_in_Pr
+      exact h_main
+
     · intro h
       cases h with
       | intro r hr
       have h_p_notin_W : p ∉ W := hr.left
-      have h_p_prime : p.Prime := by exact?
-      have h_p_gt_2 : p > 2 := by apply?
+      have h_p_prime : p.Prime := hr.2.2.1
+      have h_p_gt_2 : p > 2 := hr.2.2.2
       have h_main : p.Prime ∧ p > 2 ∧ p ∉ W := ⟨h_p_prime, h_p_gt_2, h_p_notin_W⟩
       exact h_main
+-- pairwise disjoint P r1 and P r2
+  have h_disj :  Pairwise (fun (r1 r2 : ℕ) ↦ Disjoint (P r1) (P r2)) := by
+    intro r1 r2 hne
+    rw [Set.disjoint_left]
+    intro p hp1 hp2
+    -- ord2 p = r1 and ord2 p = r2
+    have h1 : ∀ (q : ℕ), q ∈ P r1 ↔ (q ∉ W) ∧ (ord2 q = r1) ∧ q.Prime ∧ q > 2 := by
+      intro q
+      simp [P]
+    have h2 : ∀ (q : ℕ), q ∈ P r2 ↔ (q ∉ W) ∧ (ord2 q = r2) ∧ q.Prime ∧ q > 2 := by
+      intro q
+      simp [P]
+    have eq1 : ord2 p = r1 := (h1 p).mp hp1 |>.2.1
+    have eq2 : ord2 p = r2 := (h2 p).mp hp2 |>.2.1
+    rw [eq1] at eq2
+    exact hne eq2
+-- we use indicator to put every sum in N to avoid type dismatch
+  have h_left : (∑' (p : {p // p.Prime ∧ p > 2 ∧ p ∉ W}), f p) =
+  ∑' (p : ℕ), Set.indicator {p : ℕ | p.Prime ∧ p > 2 ∧ p ∉ W} f p := by
+    have h_tsum_subtype : ∀ (s : Set ℕ) (g : ℕ → ℝ), (∑' (x : {x // x ∈ s}), g (x : ℕ)) =
+    ∑' (x : ℕ), Set.indicator s g x := by
+      intro s g
+      simpa [Set.indicator] using tsum_subtype s g
+    exact h_tsum_subtype {p : ℕ | p.Prime ∧ p > 2 ∧ p ∉ W} f
+  have h_right : ∀ (r : ℕ), (∑' (p : {p // p ∈ P r}), f (p : ℕ)) =
+  ∑' (p : ℕ), Set.indicator (P r) f p := by
+    intro r
+    have h_tsum_subtype : ∀ (s : Set ℕ) (g : ℕ → ℝ), (∑' (x : {x // x ∈ s}), g (x : ℕ)) =
+    ∑' (x : ℕ), Set.indicator s g x := by
+      intro s g
+      simpa [Set.indicator] using tsum_subtype s g
+    exact h_tsum_subtype (P r) f
+  -- now by h1 we have proven that two sets are equal hence there sum are equal
+  have h_main1 : (∑' (p : ℕ), Set.indicator {p : ℕ | p.Prime ∧ p > 2 ∧ p ∉ W} f p) =
+  ∑' (p : ℕ), Set.indicator (⋃ (r : ℕ), P r) f p := by
+    rw [h1]
+  have h_main3 : (∑' (r : ℕ), ∑' (p : ℕ), Set.indicator (P r) f p) =
+    ∑' (r : ℕ), ∑' (p : {p // p ∈ P r}), f p := by
+    apply tsum_congr
+    intro r
+    exact (h_right r).symm
+  have h_fun_eq : Set.indicator (⋃ (r : ℕ), P r) f = ∑' (r : ℕ), Set.indicator (P r) f := by
+    have h : Set.indicator (⋃ (r : ℕ), P r) f = ∑' (r : ℕ), Set.indicator (P r) f := by
+      apply?
+    exact h
+  have h_step1 : (∑' (p : ℕ), (Set.indicator (⋃ (r : ℕ), P r) f) p) =
+    ∑' (p : ℕ), (∑' (r : ℕ), Set.indicator (P r) f p) := by
+    congr
+    apply?
+  have h_main2 : (∑' (p : ℕ), (∑' (r : ℕ), Set.indicator (P r) f p)) =
+    ∑' (r : ℕ), ∑' (p : ℕ), Set.indicator (P r) f p := by
+    have h_nonneg : ∀ (p r : ℕ), 0 ≤ Set.indicator (P r) f p := by
+      intro p r
+      simp [Set.indicator]
+      <;> split_ifs <;> positivity
+    apply?
+  rw [h_left, h_main1, h_step1, h_main2, h_main3]
 
 
 
@@ -361,7 +428,48 @@ def H (n : ℕ) : ℚ :=
 lemma upperBound_of_each_contribution (r : ℕ) (hr : r > 1) (h_Pfin : (P r).Finite) :
     ∑ p ∈ h_Pfin.toFinset, (1 : ℝ) / (ord2 (p^2))
     ≤ (1 : ℝ)/(r^2) * H (Nat.floor ((r * Real.log 2)/(Real.log r))) := by
-  sorry
+  let s := h_Pfin.toFinset
+  let L := P_list r h_Pfin
+  have hL_toFinset : L.toFinset = s := by
+    simp [L, P_list, s]
+  have hL_nodup : L.Nodup := by apply?
+  -- H is strictly increasing
+  have h_H_mono : ∀ (m n : ℕ), m ≤ n → (H m : ℝ) ≤ (H n : ℝ) := by
+    intro m n hmn
+    have h₁ : Finset.range m ⊆ Finset.range n := Finset.range_subset_range.mpr hmn
+    have h₂ : ∀ i ∈ Finset.range n, (i ∉ Finset.range m) → 0 ≤ (1 : ℝ) / ((i : ℝ) + 1) := by
+      intro i _ _
+      have h_pos : (0 : ℝ) < (i : ℝ) + 1 := by positivity
+      exact one_div_nonneg.mpr (by linarith)
+    simpa [H] using Finset.sum_le_sum_of_subset_of_nonneg h₁ h₂
+  -- 1/ord2(p^2) = 1/(p*r)
+  have h_main₁ : ∀ p ∈ s, (1 : ℝ) / (ord2 (p^2)) = (1 : ℝ) / ((p : ℝ) * (r : ℝ)) := by
+    intro p hp
+    have h_p_in_Pr : p ∈ P r := by exact (Set.Finite.mem_toFinset h_Pfin).mp hp
+    have h_notW : p ∉ W := h_p_in_Pr.1
+    have h_ord_eq : ord2 p = r := h_p_in_Pr.2.1
+    have h_prime : p.Prime := h_p_in_Pr.2.2.1
+    have h_gt2 : p > 2 := h_p_in_Pr.2.2.2
+    have h_ord2_p2_eq : ord2 (p^2) = p * ord2 p := nonW_primes_ord2_relation ⟨h_prime, h_gt2⟩ h_notW
+    have h_ord2_p2_eq' : ord2 (p^2) = p * r := by
+      rw [h_ord2_p2_eq, h_ord_eq]
+    have h_cast_mul : ((p * r : ℕ) : ℝ) = (p : ℝ) * (r : ℝ) := by exact Nat.cast_mul p r
+    have h_final : (1 : ℝ) / (ord2 (p^2) : ℝ) = (1 : ℝ) / ((p : ℝ) * (r : ℝ)) := by
+      have h₁ : (ord2 (p^2) : ℝ) = ((p * r : ℕ) : ℝ) := by
+        exact_mod_cast h_ord2_p2_eq'
+      rw [h₁, h_cast_mul]
+    exact h_final
+  -- simplify
+  have h_main₂ : ∑ p ∈ s, (1 : ℝ) / (ord2 (p^2)) = ∑ p ∈ s, (1 : ℝ) / ((p : ℝ) * (r : ℝ)) := by
+    apply Finset.sum_congr rfl
+    intro p hp
+    exact h_main₁ p hp
+  -- the sum of the set is the sum of the list
+  have h_main₃₁ : ∑ p ∈ s, (1 : ℝ) / ((p : ℝ) * (r : ℝ)) = (L.map (fun p ↦ (1 : ℝ) / ((p : ℝ) * (r : ℝ)))).sum := by
+    apply?
+
+
+
 
 /-
   Now, using __divideContribution_into_r__, we have that
