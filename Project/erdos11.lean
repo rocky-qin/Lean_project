@@ -10,6 +10,7 @@ import Mathlib.Data.Real.Basic
 import Mathlib.Data.Real.Basic
 import Mathlib.Algebra.BigOperators.Finsupp.Basic
 
+
 open BigOperators
 
 
@@ -386,6 +387,10 @@ lemma divideContribution_into_r :
       simpa [Set.indicator] using tsum_subtype s g
     exact h_tsum_subtype (P r) f
   -- now by h1 we have proven that two sets are equal hence there sum are equal
+  have h_fun_eq : Set.indicator (⋃ (r : ℕ), P r) f = ∑' (r : ℕ), Set.indicator (P r) f := by
+    funext p
+    apply?
+  -- we simplify those sums to the final sums to the final goal
   have h_main1 : (∑' (p : ℕ), Set.indicator {p : ℕ | p.Prime ∧ p > 2 ∧ p ∉ W} f p) =
   ∑' (p : ℕ), Set.indicator (⋃ (r : ℕ), P r) f p := by
     rw [h1]
@@ -394,20 +399,13 @@ lemma divideContribution_into_r :
     apply tsum_congr
     intro r
     exact (h_right r).symm
-  have h_fun_eq : Set.indicator (⋃ (r : ℕ), P r) f = ∑' (r : ℕ), Set.indicator (P r) f := by
-    have h : Set.indicator (⋃ (r : ℕ), P r) f = ∑' (r : ℕ), Set.indicator (P r) f := by
-      apply?
-    exact h
   have h_step1 : (∑' (p : ℕ), (Set.indicator (⋃ (r : ℕ), P r) f) p) =
     ∑' (p : ℕ), (∑' (r : ℕ), Set.indicator (P r) f p) := by
     congr
+    funext p
     apply?
   have h_main2 : (∑' (p : ℕ), (∑' (r : ℕ), Set.indicator (P r) f p)) =
     ∑' (r : ℕ), ∑' (p : ℕ), Set.indicator (P r) f p := by
-    have h_nonneg : ∀ (p r : ℕ), 0 ≤ Set.indicator (P r) f p := by
-      intro p r
-      simp [Set.indicator]
-      <;> split_ifs <;> positivity
     apply?
   rw [h_left, h_main1, h_step1, h_main2, h_main3]
 
@@ -432,7 +430,7 @@ lemma upperBound_of_each_contribution (r : ℕ) (hr : r > 1) (h_Pfin : (P r).Fin
   let L := P_list r h_Pfin
   have hL_toFinset : L.toFinset = s := by
     simp [L, P_list, s]
-  have hL_nodup : L.Nodup := by apply?
+  have hL_nodup : L.Nodup := by apply?  -- every elem in P r is different
   -- H is strictly increasing
   have h_H_mono : ∀ (m n : ℕ), m ≤ n → (H m : ℝ) ≤ (H n : ℝ) := by
     intro m n hmn
@@ -466,7 +464,25 @@ lemma upperBound_of_each_contribution (r : ℕ) (hr : r > 1) (h_Pfin : (P r).Fin
     exact h_main₁ p hp
   -- the sum of the set is the sum of the list
   have h_main₃₁ : ∑ p ∈ s, (1 : ℝ) / ((p : ℝ) * (r : ℝ)) = (L.map (fun p ↦ (1 : ℝ) / ((p : ℝ) * (r : ℝ)))).sum := by
+    have h₁ : L.toFinset = s := hL_toFinset
+    have h₂ : L.Nodup := hL_nodup
+    rw [← h₁]
     apply?
+  -- since pj ≥ (j+1) * r,  then 1/(pj * r) ≤ 1/((j+1)*r) * r
+  have h_main₃₂ : ∀ (l : List ℕ) (j : ℕ) (hj : j < l.length),
+    (1 : ℝ) / (((L[j]' (Finset.mem_range.mp ‹j ∈ Finset.range L.length›)) : ℝ) * (r : ℝ)) ≤ (1 : ℝ) / ((( (j + 1 : ℕ) : ℝ) * (r : ℝ)) * (r : ℝ)) := by
+    intro j hj
+    have h_j_lt : j < L.length := Finset.mem_range.mp hj
+    have h_lb : L[j] ≥ (j + 1) * r + 1 := lowerBound_of_p_in_P_r r (by linarith) h_Pfin j h_j_lt
+    have h_pos1 : (0 : ℝ) < ((L[j] : ℝ) * (r : ℝ)) := by positivity
+    have h_pos2 : (0 : ℝ) < ((( (j + 1 : ℕ) : ℝ) * (r : ℝ)) * (r : ℝ)) := by positivity
+    have h_ineq1 : ((L[j] : ℝ) * (r : ℝ)) ≥ ((( (j + 1 : ℕ) : ℝ) * (r : ℝ)) * (r : ℝ)) := by
+      have h₁ : (L[j] : ℝ) ≥ (((j + 1 : ℕ) : ℝ) * (r : ℝ) + 1) := by exact_mod_cast h_lb
+      have h₂ : (L[j] : ℝ) ≥ (((j + 1 : ℕ) : ℝ) * (r : ℝ)) := by linarith
+      have h₃ : ((L[j] : ℝ) * (r : ℝ)) ≥ ((( (j + 1 : ℕ) : ℝ) * (r : ℝ)) * (r : ℝ)) := by
+        have h₄ : (r : ℝ) > 0 := by exact_mod_cast hr
+        nlinarith
+      exact h₃
 
 
 
